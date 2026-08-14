@@ -1,6 +1,6 @@
 create table if not exists public.orders (
   id bigint generated always as identity primary key,
-  order_id text not null unique,
+  order_id uuid not null unique,
   customer_name text not null,
   customer_mobile text not null,
   login_method text not null check (login_method in ('google', 'mobile')),

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { calculateCheckout, sanitizeCheckoutItems } from "@/lib/checkout";
 import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import {
@@ -96,7 +97,7 @@ export async function POST(request: Request) {
   }
 
   const totals = calculateCheckout(items);
-  const orderId = `CFC-${Date.now().toString().slice(-6)}`;
+  const orderId = crypto.randomUUID();
   const billMessage = `Bill ${orderId}: ${money(totals.total)} for ${items.reduce(
     (sum, item) => sum + item.quantity,
     0,
