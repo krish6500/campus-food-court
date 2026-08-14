@@ -1,9 +1,15 @@
+import { redirect } from "next/navigation";
 import OwnerMenuManager from "../components/OwnerMenuManager";
+import { isOwnerAuthenticated } from "../../lib/owner-auth";
 import { supabase } from "../../lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export default async function OwnerPage() {
+  if (!(await isOwnerAuthenticated())) {
+    redirect("/owner/login");
+  }
+
   const { data: stalls, error } = await supabase
     .from("stalls")
     .select("*, menu_items(*)");

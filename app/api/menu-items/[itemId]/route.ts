@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import { supabase } from "@/lib/supabase";
 
 type MenuItemUpdate = {
@@ -38,6 +39,10 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ itemId: string }> },
 ) {
+  if (!(await isOwnerAuthenticated())) {
+    return NextResponse.json({ error: "Owner login required." }, { status: 401 });
+  }
+
   const { itemId } = await context.params;
   const payload = (await request.json().catch(() => null)) as
     | MenuItemUpdate
@@ -74,6 +79,10 @@ export async function DELETE(
   _request: Request,
   context: { params: Promise<{ itemId: string }> },
 ) {
+  if (!(await isOwnerAuthenticated())) {
+    return NextResponse.json({ error: "Owner login required." }, { status: 401 });
+  }
+
   const { itemId } = await context.params;
   const { error } = await supabase
     .from("menu_items")

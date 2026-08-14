@@ -33,7 +33,6 @@ const paymentMethods = [
 ] as const;
 
 const UPI_ID = "9008799949@ybl";
-const ORDERS_STORAGE_KEY = "campus_food_court_orders";
 
 type CheckoutStatus = {
   tone: "success" | "error" | "info";
@@ -59,6 +58,7 @@ type StoredOrder = {
   total: number;
   createdAt: string;
   billMessage: string;
+  smsStatus?: string;
 };
 
 type RazorpaySuccessResponse = {
@@ -124,22 +124,6 @@ function checkoutItemsFromLines(lines: CartLine[]) {
   }));
 }
 
-function readOrders(): StoredOrder[] {
-  try {
-    return JSON.parse(localStorage.getItem(ORDERS_STORAGE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveOrder(order: StoredOrder) {
-  const orders = readOrders();
-  localStorage.setItem(
-    ORDERS_STORAGE_KEY,
-    JSON.stringify([order, ...orders].slice(0, 50)),
-  );
-}
-
 function buildStoredOrder({
   activeCustomer,
   selectedPaymentMethod,
@@ -195,6 +179,7 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
   const [customer, setCustomer] = useState<CustomerProfile | null>(null);
   const [latestOrderId, setLatestOrderId] = useState<string | null>(null);
   const [readyNotice, setReadyNotice] = useState<string | null>(null);
+  const [isUpiQrOpen, setIsUpiQrOpen] = useState(false);
 
   const stallNames = useMemo(
     () => ["All", ...stalls.map((stall) => stall.stall_name)],
@@ -246,10 +231,17 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
       return;
     }
 
-    const checkOrderStatus = () => {
-      const order = readOrders().find(
-        (storedOrder) => storedOrder.orderId === latestOrderId,
-      );
+    const checkOrderStatus = async () => {
+      const response = await fetch(`/api/orders?orderId=${latestOrderId}`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      const order = data.order;
 
       if (order?.status === "ready") {
         const message = `Order ${order.orderId} is ready. Please pick it up from the counter.`;
@@ -272,6 +264,7 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
 
   function addToCart(item: MenuItem, stallName: string) {
     setCheckoutStatus(null);
+    setIsUpiQrOpen(false);
     setCart((current) => {
       const key = String(item.item_id);
       const existing = current[key];
@@ -374,7 +367,7 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
     }
   }
 
-  function recordCounterOrder(
+  async function recordCounterOrder(
     activeCustomer: CustomerProfile,
     selectedPaymentMethod: (typeof paymentMethods)[number],
   ) {
@@ -389,12 +382,21 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
       total,
     });
 
-    saveOrder(order);
-    window.dispatchEvent(new Event("campus-food-court-orders"));
-    setLatestOrderId(order.orderId);
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(order),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.error ?? "Could not send order to counter.");
+    }
+
+    setLatestOrderId(data.order.orderId);
     setReadyNotice(null);
 
-    return order;
+    return data.order as StoredOrder;
   }
 
   function methodOptions() {
@@ -439,14 +441,23 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
     }
 
     await requestPickupNotifications();
+    setIsUpiQrOpen(paymentMethod === "UPI");
 
     if (paymentMethod === "Cash at Counter") {
-      const order = recordCounterOrder(activeCustomer, paymentMethod);
-      setCheckoutStatus({
-        tone: "success",
-        message: `${order.billMessage} Counter received the order. Pay cash during pickup.`,
-      });
-      setCart({});
+      try {
+        const order = await recordCounterOrder(activeCustomer, paymentMethod);
+        setCheckoutStatus({
+          tone: "success",
+          message: `${order.billMessage} Pay cash during pickup. ${order.smsStatus ?? ""}`,
+        });
+        setCart({});
+      } catch (error) {
+        setCheckoutStatus({
+          tone: "error",
+          message:
+            error instanceof Error ? error.message : "Could not place order.",
+        });
+      }
       return;
     }
 
@@ -479,11 +490,11 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
           throw new Error("Demo payment verification failed.");
         }
 
-        const order = recordCounterOrder(activeCustomer, paymentMethod);
+        const order = await recordCounterOrder(activeCustomer, paymentMethod);
         setCheckoutStatus({
           tone: "success",
           message:
-            `${order.billMessage} Counter received the order. Add Razorpay keys to enable live checkout.`,
+            `${order.billMessage} ${order.smsStatus ?? ""} Add Razorpay keys to enable live checkout.`,
         });
         setCart({});
         return;
@@ -519,9 +530,10 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
             return;
           }
 
+          const order = await recordCounterOrder(activeCustomer, paymentMethod);
           setCheckoutStatus({
             tone: "success",
-            message: `${recordCounterOrder(activeCustomer, paymentMethod).billMessage} Counter received the order via ${paymentMethod}.`,
+            message: `${order.billMessage} Counter received the order via ${paymentMethod}. ${order.smsStatus ?? ""}`,
           });
           setCart({});
         },
@@ -854,7 +866,7 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
             </select>
           </div>
 
-          {paymentMethod === "UPI" ? (
+          {paymentMethod === "UPI" && (isUpiQrOpen || itemCount > 0) ? (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
               <p className="text-sm font-extrabold text-emerald-900">
                 Scan to pay UPI

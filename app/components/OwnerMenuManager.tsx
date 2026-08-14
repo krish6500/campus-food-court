@@ -55,8 +55,6 @@ type CounterOrder = {
   billMessage: string;
 };
 
-const ORDERS_STORAGE_KEY = "campus_food_court_orders";
-
 const emptyForm: FormState = {
   stall_id: "",
   name: "",
@@ -74,14 +72,6 @@ function money(value: number) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function readCounterOrders(): CounterOrder[] {
-  try {
-    return JSON.parse(localStorage.getItem(ORDERS_STORAGE_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
 }
 
 export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
@@ -120,16 +110,21 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
   const activeOrders = counterOrders.filter((order) => order.status !== "ready");
 
   useEffect(() => {
-    const syncOrders = () => setCounterOrders(readCounterOrders());
+    const syncOrders = async () => {
+      const response = await fetch("/api/orders", { cache: "no-store" });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      setCounterOrders(data.orders ?? []);
+    };
 
     syncOrders();
-    window.addEventListener("storage", syncOrders);
-    window.addEventListener("campus-food-court-orders", syncOrders);
     const interval = window.setInterval(syncOrders, 3000);
 
     return () => {
-      window.removeEventListener("storage", syncOrders);
-      window.removeEventListener("campus-food-court-orders", syncOrders);
       window.clearInterval(interval);
     };
   }, []);
@@ -284,24 +279,41 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
     }
   }
 
-  function updateOrderStatus(
+  async function updateOrderStatus(
     orderId: string,
     nextStatus: CounterOrder["status"],
   ) {
-    const nextOrders = counterOrders.map((order) =>
-      order.orderId === orderId ? { ...order, status: nextStatus } : order,
-    );
+    try {
+      const response = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = await response.json();
 
-    setCounterOrders(nextOrders);
-    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(nextOrders));
-    window.dispatchEvent(new Event("campus-food-court-orders"));
-    setStatus({
-      tone: "success",
-      message:
-        nextStatus === "ready"
-          ? `Order ${orderId} marked ready. Customer can pick it up.`
-          : `Order ${orderId} moved to preparing.`,
-    });
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Could not update order.");
+      }
+
+      setCounterOrders((current) =>
+        current.map((order) =>
+          order.orderId === orderId ? data.order : order,
+        ),
+      );
+      setStatus({
+        tone: "success",
+        message:
+          nextStatus === "ready"
+            ? `Order ${orderId} marked ready. Customer can pick it up. ${data.order.smsStatus ?? ""}`
+            : `Order ${orderId} moved to preparing.`,
+      });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message:
+          error instanceof Error ? error.message : "Could not update order.",
+      });
+    }
   }
 
   return (
@@ -327,6 +339,14 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
             >
               Customer view
             </Link>
+            <form action="/api/owner/logout" method="post">
+              <button
+                className="h-11 rounded-md border border-zinc-300 bg-white px-4 text-sm font-bold text-zinc-700 hover:border-zinc-500"
+                type="submit"
+              >
+                Logout
+              </button>
+            </form>
             <div className="rounded-md bg-zinc-100 px-4 py-3 text-center">
               <p className="text-lg font-extrabold">{totalItems}</p>
               <p className="text-xs font-semibold text-zinc-500">Items</p>
@@ -387,12 +407,12 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
 
                   <div className="mt-3 space-y-2 text-sm">
                     <p className="font-semibold text-zinc-700">
-                      {order.customer.name} · {order.customer.mobile} ·{" "}
+                      {order.customer.name} / {order.customer.mobile} /{" "}
                       {order.customer.loginMethod}
                     </p>
                     <p className="font-semibold text-zinc-700">
                       {order.paymentMethod}
-                      {order.paymentUpiId ? ` · ${order.paymentUpiId}` : ""} ·{" "}
+                      {order.paymentUpiId ? ` / ${order.paymentUpiId}` : ""} /{" "}
                       {money(order.total)}
                     </p>
                     <div className="rounded-md bg-white p-3">

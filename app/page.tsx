@@ -1,4 +1,3 @@
-import Link from "next/link";
 import MenuBoard from "./components/MenuBoard";
 import { supabase } from "../lib/supabase";
 
@@ -30,12 +29,6 @@ export default async function Home() {
             </p>
           </div>
           <div className="flex flex-wrap justify-start gap-2 md:justify-end">
-            <Link
-              className="flex h-11 items-center rounded-md border border-zinc-300 bg-white px-4 text-sm font-bold text-zinc-700 hover:border-zinc-500"
-              href="/owner"
-            >
-              Owner dashboard
-            </Link>
             <div className="rounded-md bg-zinc-100 px-4 py-3">
               <p className="text-lg font-extrabold text-zinc-950">
                 {stalls?.length ?? 0}

@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import { supabase } from "@/lib/supabase";
 
 type MenuItemPayload = {
@@ -31,6 +32,10 @@ function cleanPayload(payload: MenuItemPayload) {
 }
 
 export async function POST(request: Request) {
+  if (!(await isOwnerAuthenticated())) {
+    return NextResponse.json({ error: "Owner login required." }, { status: 401 });
+  }
+
   const payload = (await request.json().catch(() => null)) as
     | MenuItemPayload
     | null;
