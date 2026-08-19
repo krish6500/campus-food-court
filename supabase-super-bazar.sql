@@ -18,6 +18,9 @@ create table if not exists public.serviceable_pincodes (
   created_at timestamptz not null default now()
 );
 
+alter table public.menu_items
+  add column if not exists category text default 'Fresh';
+
 insert into public.banners (
   title,
   subtitle,

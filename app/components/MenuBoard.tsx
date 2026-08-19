@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   money,
   productImages,
@@ -169,6 +169,13 @@ function groupProducts(products: ShopProduct[]) {
   }));
 }
 
+function categoryAnchor(category: string) {
+  return category
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 function useCartCount() {
   const [cartCount, setCartCount] = useState(0);
 
@@ -268,6 +275,16 @@ function TopNavbar({
   setCategory: (value: string) => void;
   categories: string[];
 }) {
+  const [draftQuery, setDraftQuery] = useState(query);
+
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setQuery(draftQuery.trim());
+    document
+      .getElementById("super-bazar-results")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <header className="fixed left-0 right-0 top-0 z-50">
       <div className="flex min-h-16 items-center gap-4 bg-[#131921] px-4 text-white">
@@ -278,7 +295,10 @@ function TopNavbar({
           <span className="block text-zinc-300">Deliver to</span>
           <span className="block text-sm font-extrabold">560068</span>
         </button>
-        <div className="flex h-11 min-w-0 flex-1 overflow-hidden rounded-sm">
+        <form
+          className="flex h-11 min-w-0 flex-1 overflow-hidden rounded-sm"
+          onSubmit={submitSearch}
+        >
           <label className="sr-only" htmlFor="category-search">
             Category
           </label>
@@ -299,18 +319,18 @@ function TopNavbar({
           <input
             className="min-w-0 flex-1 px-3 text-base text-zinc-950 outline-none"
             id="site-search"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => setDraftQuery(event.target.value)}
             placeholder="Search Super Bazar"
             type="search"
-            value={query}
+            value={draftQuery}
           />
           <button
             className="w-20 bg-amber-400 text-sm font-extrabold text-zinc-950 hover:bg-amber-300"
-            type="button"
+            type="submit"
           >
             Search
           </button>
-        </div>
+        </form>
         <Link className="relative shrink-0 px-2 py-1 text-sm font-extrabold" href="/cart">
           <span className="absolute -top-1 left-5 rounded-full bg-amber-400 px-1.5 text-xs text-zinc-950">
             {cartCount}
@@ -321,7 +341,11 @@ function TopNavbar({
       <nav className="flex h-11 items-center gap-5 overflow-x-auto bg-[#232f3e] px-4 text-sm font-bold text-white">
         <span className="shrink-0">All</span>
         {categories.map((item) => (
-          <a className="shrink-0 hover:text-amber-300" href={`#${item}`} key={item}>
+          <a
+            className="shrink-0 hover:text-amber-300"
+            href={`#${categoryAnchor(item)}`}
+            key={item}
+          >
             {item}
           </a>
         ))}
@@ -384,12 +408,15 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
       />
       <HeroBanner />
       <main className="mx-auto -mt-10 max-w-[1500px] px-5 pb-10">
-        <section className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <section
+          className="grid scroll-mt-32 gap-5 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
+          id="super-bazar-results"
+        >
           {groups.length > 0 ? (
             groups.map((group) => (
               <article
                 className="relative z-10 min-h-[420px] bg-white p-5 shadow-sm"
-                id={group.category}
+                id={categoryAnchor(group.category)}
                 key={group.category}
               >
                 <h2 className="text-2xl font-extrabold leading-tight">

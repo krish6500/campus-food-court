@@ -113,6 +113,17 @@ export default function CheckoutPage() {
     router.push(`/order-confirmation?orderId=${orderId}&total=${totals.total}`);
   }
 
+  function goToStep(nextStep: Step) {
+    setStatus(null);
+    setStep(nextStep);
+  }
+
+  function changeLogin() {
+    localStorage.removeItem(SUPER_BAZAR_TOKEN_KEY);
+    setStatus(null);
+    setStep("login");
+  }
+
   return (
     <main className="min-h-screen bg-[#e3e6e6] text-zinc-950">
       <header className="bg-[#131921] px-5 py-4 text-white">
@@ -128,16 +139,18 @@ export default function CheckoutPage() {
             <div className="mt-4 grid grid-cols-4 gap-2 text-center text-xs font-extrabold uppercase">
               {(["login", "address", "payment", "review"] as Step[]).map(
                 (item) => (
-                  <span
-                    className={`rounded-full px-2 py-2 ${
+                  <button
+                    className={`rounded-full px-2 py-2 transition ${
                       item === step
                         ? "bg-amber-300 text-zinc-950"
-                        : "bg-zinc-100 text-zinc-500"
+                        : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200"
                     }`}
                     key={item}
+                    onClick={() => goToStep(item)}
+                    type="button"
                   >
                     {item}
-                  </span>
+                  </button>
                 ),
               )}
             </div>
@@ -179,8 +192,37 @@ export default function CheckoutPage() {
 
           {step === "address" ? (
             <section className="bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-extrabold">Delivery address</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-xl font-extrabold">Delivery address</h2>
+                <button
+                  className="rounded-sm border border-zinc-300 px-3 py-2 text-sm font-extrabold hover:bg-zinc-100"
+                  onClick={changeLogin}
+                  type="button"
+                >
+                  Change login
+                </button>
+              </div>
               <div className="mt-4 grid gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    className="h-11 rounded-sm border border-zinc-300 px-3"
+                    onChange={(event) =>
+                      setAddress({ ...address, fullName: event.target.value })
+                    }
+                    placeholder="Full name"
+                    value={address.fullName}
+                  />
+                  <input
+                    className="h-11 rounded-sm border border-zinc-300 px-3"
+                    inputMode="numeric"
+                    maxLength={10}
+                    onChange={(event) =>
+                      setAddress({ ...address, mobile: event.target.value })
+                    }
+                    placeholder="Mobile number"
+                    value={address.mobile}
+                  />
+                </div>
                 <input
                   className="h-11 rounded-sm border border-zinc-300 px-3"
                   onChange={(event) =>
