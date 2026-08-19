@@ -319,7 +319,10 @@ function TopNavbar({
           <input
             className="min-w-0 flex-1 px-3 text-base text-zinc-950 outline-none"
             id="site-search"
-            onChange={(event) => setDraftQuery(event.target.value)}
+            onChange={(event) => {
+              setDraftQuery(event.target.value);
+              setQuery(event.target.value.trim());
+            }}
             placeholder="Search Super Bazar"
             type="search"
             value={draftQuery}

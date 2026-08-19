@@ -494,15 +494,16 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
             <div className="mt-4 grid gap-3 text-sm">
               <label className="flex items-center justify-between rounded-md border border-zinc-200 p-3 font-bold">
                 Mock card checkout
-                <input checked readOnly className="h-4 w-4 accent-emerald-700" type="checkbox" />
-              </label>
-              <label className="flex items-center justify-between rounded-md border border-zinc-200 p-3 font-bold text-zinc-500">
-                Razorpay live gateway
                 <input readOnly className="h-4 w-4" type="checkbox" />
               </label>
+              <label className="flex items-center justify-between rounded-md border border-zinc-200 p-3 font-bold">
+                Razorpay live gateway
+                <input checked readOnly className="h-4 w-4 accent-emerald-700" type="checkbox" />
+              </label>
               <p className="text-xs font-semibold text-zinc-500">
-                Razorpay is removed from the Super Bazar checkout UI. Keep
-                Razorpay keys empty in Vercel while using mock payments.
+                Orders are sent to the counter only after Razorpay payment
+                verification succeeds. Add Razorpay keys in Vercel before going
+                live.
               </p>
             </div>
           </div>

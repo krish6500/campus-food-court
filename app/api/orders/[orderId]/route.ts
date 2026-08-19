@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { sendCustomerMessage } from "@/lib/customer-message";
 import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import { type OrderStatus, updateOrderStatus } from "@/lib/orders";
-import { sendSms } from "@/lib/sms";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +32,7 @@ export async function PATCH(
     let smsStatus = order.smsStatus;
 
     if (body.status === "ready") {
-      smsStatus = await sendSms({
+      smsStatus = await sendCustomerMessage({
         to: order.customer.mobile,
         message: `Order ${order.orderId} is ready. Please pick it up from the counter.`,
       });

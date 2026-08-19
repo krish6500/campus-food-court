@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { calculateCheckout, sanitizeCheckoutItems } from "@/lib/checkout";
+import { sendCustomerMessage } from "@/lib/customer-message";
 import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import {
   createOrder,
@@ -9,9 +10,7 @@ import {
   type CustomerProfile,
   type StoredOrder,
 } from "@/lib/orders";
-import { sendSms } from "@/lib/sms";
-
-const UPI_ID = "9008799949@ybl";
+import { verifyRazorpayPaymentSignature } from "@/lib/razorpay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,7 +79,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const customer = sanitizeCustomer(body?.customer);
   const items = sanitizeCheckoutItems(body?.items);
-  const paymentMethod = String(body?.paymentMethod ?? "UPI");
+  const payment = {
+    razorpay_order_id: String(body?.payment?.razorpay_order_id ?? ""),
+    razorpay_payment_id: String(body?.payment?.razorpay_payment_id ?? ""),
+    razorpay_signature: String(body?.payment?.razorpay_signature ?? ""),
+  };
 
   if (!customer) {
     return NextResponse.json(
@@ -96,22 +99,41 @@ export async function POST(request: Request) {
     );
   }
 
+  try {
+    if (!verifyRazorpayPaymentSignature(payment)) {
+      return NextResponse.json(
+        { error: "Payment was not verified. Order was not placed." },
+        { status: 400 },
+      );
+    }
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Payment verification failed.",
+      },
+      { status: 500 },
+    );
+  }
+
   const totals = calculateCheckout(items);
   const orderId = crypto.randomUUID();
-  const billMessage = `Bill ${orderId}: ${money(totals.total)} for ${items.reduce(
+  const billMessage = `Payment successful. Bill ${orderId}: ${money(totals.total)} for ${items.reduce(
     (sum, item) => sum + item.quantity,
     0,
-  )} item(s). Counter received your order.`;
-  const smsStatus = await sendSms({
+  )} item(s). Counter received your order. We will message again when it is ready for pickup.`;
+  const smsStatus = await sendCustomerMessage({
     to: customer.mobile,
-    message: `${billMessage} We will message again when it is ready for pickup.`,
+    message: billMessage,
   });
   const order: StoredOrder = {
     orderId,
     customer,
     items,
-    paymentMethod,
-    paymentUpiId: paymentMethod === "UPI" ? UPI_ID : undefined,
+    paymentMethod: "Razorpay",
+    paymentUpiId: payment.razorpay_payment_id,
     status: "sent_to_counter",
     subtotal: totals.subtotal,
     gst: totals.gst,

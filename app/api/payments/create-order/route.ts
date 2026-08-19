@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { calculateCheckout, sanitizeCheckoutItems } from "@/lib/checkout";
+import { getRazorpayKeyId, hasRazorpayKeys } from "@/lib/razorpay";
 import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
@@ -64,17 +65,11 @@ export async function POST(request: Request) {
 
   const totals = calculateCheckout(validatedItems);
 
-  if (!keyId || !keySecret) {
-    return NextResponse.json({
-      mode: "demo",
-      keyId: null,
-      order: {
-        id: `demo_order_${Date.now()}`,
-        amount: totals.totalPaise,
-        currency: "INR",
-      },
-      totals,
-    });
+  if (!hasRazorpayKeys() || !keySecret) {
+    return NextResponse.json(
+      { error: "Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in Vercel." },
+      { status: 500 },
+    );
   }
 
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
@@ -112,7 +107,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     mode: "razorpay",
-    keyId,
+    keyId: getRazorpayKeyId(),
     order,
     totals,
   });

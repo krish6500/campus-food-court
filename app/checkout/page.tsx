@@ -1,9 +1,10 @@
 "use client";
 
+import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { calculateCheckout } from "@/lib/checkout";
 import {
-  cartTotals,
   money,
   readCart,
   SUPER_BAZAR_TOKEN_KEY,
@@ -12,6 +13,41 @@ import {
 } from "@/lib/shop";
 
 type Step = "login" | "address" | "payment" | "review";
+
+type RazorpaySuccessResponse = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill: {
+    name: string;
+    contact: string;
+  };
+  theme: {
+    color: string;
+  };
+  handler: (response: RazorpaySuccessResponse) => void;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => {
+      open: () => void;
+      on: (
+        event: "payment.failed",
+        handler: (response: { error?: { description?: string } }) => void,
+      ) => void;
+    };
+  }
+}
 
 type AddressState = {
   fullName: string;
@@ -36,7 +72,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState<AddressState>(emptyAddress);
   const [status, setStatus] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const totals = cartTotals(items);
+  const totals = calculateCheckout(items);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -106,11 +142,119 @@ export default function CheckoutPage() {
     }
   }
 
-  function completePayment() {
-    const orderId = `SB-${Date.now().toString().slice(-8)}`;
+  async function savePaidOrder(payment: RazorpaySuccessResponse) {
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer: {
+          loginMethod: "mobile",
+          name: address.fullName,
+          mobile: address.mobile,
+        },
+        items,
+        payment,
+      }),
+    });
+    const data = await response.json();
 
+    if (!response.ok) {
+      throw new Error(data?.error ?? "Payment succeeded, but order was not saved.");
+    }
+
+    const orderId = data.order?.orderId ?? data.order?.order_id;
     writeCart([]);
-    router.push(`/order-confirmation?orderId=${orderId}&total=${totals.total}`);
+    router.push(
+      `/order-confirmation?orderId=${orderId}&total=${data.order?.total ?? totals.total}`,
+    );
+  }
+
+  async function startRazorpayPayment() {
+    setIsBusy(true);
+    setStatus(null);
+
+    try {
+      if (items.length === 0) {
+        throw new Error("Your cart is empty.");
+      }
+
+      if (!address.fullName || !address.mobile || !address.line1) {
+        throw new Error("Complete login and address before payment.");
+      }
+
+      const response = await fetch("/api/payments/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Could not start Razorpay payment.");
+      }
+
+      if (!window.Razorpay) {
+        throw new Error("Razorpay checkout did not load. Refresh and try again.");
+      }
+
+      const razorpay = new window.Razorpay({
+        key: data.keyId,
+        amount: data.order.amount,
+        currency: data.order.currency ?? "INR",
+        name: "Super Bazar",
+        description: "Super Bazar order payment",
+        order_id: data.order.id,
+        prefill: {
+          name: address.fullName,
+          contact: address.mobile,
+        },
+        theme: {
+          color: "#facc15",
+        },
+        handler: async (paymentResponse) => {
+          setIsBusy(true);
+          setStatus(null);
+
+          try {
+            const verifyResponse = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(paymentResponse),
+            });
+            const verifyData = await verifyResponse.json();
+
+            if (!verifyResponse.ok || !verifyData.verified) {
+              throw new Error(
+                verifyData?.error ?? "Payment verification failed.",
+              );
+            }
+
+            await savePaidOrder(paymentResponse);
+          } catch (error) {
+            setStatus(
+              error instanceof Error
+                ? error.message
+                : "Payment succeeded, but order could not be placed.",
+            );
+          } finally {
+            setIsBusy(false);
+          }
+        },
+      });
+
+      razorpay.on("payment.failed", (paymentResponse) => {
+        setStatus(paymentResponse.error?.description ?? "Payment failed.");
+        setIsBusy(false);
+      });
+
+      setIsBusy(false);
+      razorpay.open();
+    } catch (error) {
+      setStatus(
+        error instanceof Error ? error.message : "Could not open Razorpay.",
+      );
+      setIsBusy(false);
+    }
   }
 
   function goToStep(nextStep: Step) {
@@ -126,6 +270,7 @@ export default function CheckoutPage() {
 
   return (
     <main className="min-h-screen bg-[#e3e6e6] text-zinc-950">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
       <header className="bg-[#131921] px-5 py-4 text-white">
         <div className="mx-auto max-w-5xl text-2xl font-extrabold">
           Super Bazar Checkout
@@ -265,32 +410,18 @@ export default function CheckoutPage() {
 
           {step === "payment" ? (
             <section className="bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-extrabold">Mock payment gateway</h2>
-              <div className="mt-4 grid gap-3">
-                <input
-                  className="h-11 rounded-sm border border-zinc-300 px-3"
-                  inputMode="numeric"
-                  placeholder="Card number"
-                />
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    className="h-11 rounded-sm border border-zinc-300 px-3"
-                    placeholder="MM/YY"
-                  />
-                  <input
-                    className="h-11 rounded-sm border border-zinc-300 px-3"
-                    inputMode="numeric"
-                    placeholder="CVV"
-                    type="password"
-                  />
-                </div>
-              </div>
+              <h2 className="text-xl font-extrabold">Razorpay payment</h2>
+              <p className="mt-2 text-sm font-semibold text-zinc-600">
+                Your order will be sent to the counter only after Razorpay
+                confirms and the server verifies the payment.
+              </p>
               <button
-                className="mt-4 h-11 rounded-full bg-amber-300 px-6 text-sm font-extrabold hover:bg-amber-400"
-                onClick={() => setStep("review")}
+                className="mt-4 h-11 rounded-full bg-amber-300 px-6 text-sm font-extrabold hover:bg-amber-400 disabled:bg-zinc-200"
+                disabled={isBusy}
+                onClick={startRazorpayPayment}
                 type="button"
               >
-                Review order
+                Pay {money(totals.total)} with Razorpay
               </button>
             </section>
           ) : null}
@@ -303,7 +434,7 @@ export default function CheckoutPage() {
               </p>
               <button
                 className="mt-4 h-11 rounded-full bg-amber-300 px-6 text-sm font-extrabold hover:bg-amber-400"
-                onClick={completePayment}
+                onClick={startRazorpayPayment}
                 type="button"
               >
                 Pay {money(totals.total)} and place order
@@ -338,8 +469,12 @@ export default function CheckoutPage() {
               <span>{money(totals.subtotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Delivery</span>
-              <span>{money(totals.deliveryFee)}</span>
+              <span>GST</span>
+              <span>{money(totals.gst)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Platform fee</span>
+              <span>{money(totals.platformFee)}</span>
             </div>
             <div className="flex justify-between text-lg font-extrabold">
               <span>Total</span>
