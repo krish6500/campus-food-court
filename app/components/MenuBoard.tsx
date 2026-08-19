@@ -36,6 +36,72 @@ type Banner = {
   isActive: boolean;
 };
 
+const demoProducts: ShopProduct[] = [
+  {
+    id: "demo-mobile-1",
+    name: "5G Smartphone",
+    price: 14999,
+    category: "Mobiles",
+    stallName: "Super Bazar Devices",
+    imageUrl:
+      "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=500&q=80",
+  },
+  {
+    id: "demo-electronics-1",
+    name: "Wireless Headphones",
+    price: 1299,
+    category: "Electronics",
+    stallName: "Super Bazar Electronics",
+    imageUrl:
+      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=500&q=80",
+  },
+  {
+    id: "demo-home-1",
+    name: "Kitchen Storage Set",
+    price: 499,
+    category: "Home & Kitchen",
+    stallName: "Home Essentials",
+    imageUrl:
+      "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&w=500&q=80",
+  },
+  {
+    id: "demo-fashion-1",
+    name: "Campus Sneakers",
+    price: 799,
+    category: "Fashion",
+    stallName: "Style Hub",
+    imageUrl:
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80",
+  },
+  {
+    id: "demo-beauty-1",
+    name: "Daily Care Kit",
+    price: 349,
+    category: "Beauty",
+    stallName: "Personal Care",
+    imageUrl:
+      "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=500&q=80",
+  },
+  {
+    id: "demo-computer-1",
+    name: "Laptop Backpack",
+    price: 899,
+    category: "Computers",
+    stallName: "Tech Gear",
+    imageUrl:
+      "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=500&q=80",
+  },
+  {
+    id: "demo-deal-1",
+    name: "Festival Combo Pack",
+    price: 599,
+    category: "Daily Deals",
+    stallName: "Super Deals",
+    imageUrl:
+      "https://images.unsplash.com/photo-1607083206968-13611e3d76db?auto=format&fit=crop&w=500&q=80",
+  },
+];
+
 const fallbackBanners: Banner[] = [
   {
     id: "great-indian-festival",
@@ -65,7 +131,7 @@ function priceOf(item: MenuItem) {
 }
 
 function toProducts(stalls: Stall[]): ShopProduct[] {
-  return stalls.flatMap((stall, stallIndex) =>
+  const products = stalls.flatMap((stall, stallIndex) =>
     (stall.menu_items ?? [])
       .filter((item) => item.is_available !== false)
       .map((item, itemIndex) => ({
@@ -80,6 +146,13 @@ function toProducts(stalls: Stall[]): ShopProduct[] {
         imageUrl: productImages[(stallIndex + itemIndex) % productImages.length],
       })),
   );
+
+  const existingCategories = new Set(products.map((product) => product.category));
+  const missingDemoProducts = demoProducts.filter(
+    (product) => !existingCategories.has(product.category),
+  );
+
+  return [...products, ...missingDemoProducts];
 }
 
 function groupProducts(products: ShopProduct[]) {
@@ -186,12 +259,14 @@ function TopNavbar({
   setQuery,
   category,
   setCategory,
+  categories,
 }: {
   cartCount: number;
   query: string;
   setQuery: (value: string) => void;
   category: string;
   setCategory: (value: string) => void;
+  categories: string[];
 }) {
   return (
     <header className="fixed left-0 right-0 top-0 z-50">
@@ -214,7 +289,7 @@ function TopNavbar({
             value={category}
           >
             <option>All</option>
-            {marketplaceCategories.map((item) => (
+            {categories.map((item) => (
               <option key={item}>{item}</option>
             ))}
           </select>
@@ -245,7 +320,7 @@ function TopNavbar({
       </div>
       <nav className="flex h-11 items-center gap-5 overflow-x-auto bg-[#232f3e] px-4 text-sm font-bold text-white">
         <span className="shrink-0">All</span>
-        {marketplaceCategories.map((item) => (
+        {categories.map((item) => (
           <a className="shrink-0 hover:text-amber-300" href={`#${item}`} key={item}>
             {item}
           </a>
@@ -260,6 +335,13 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
   const [category, setCategory] = useState("All");
   const cartCount = useCartCount();
   const products = useMemo(() => toProducts(stalls), [stalls]);
+  const categories = useMemo(
+    () =>
+      Array.from(
+        new Set([...marketplaceCategories, ...products.map((product) => product.category)]),
+      ),
+    [products],
+  );
   const groups = useMemo(() => {
     const search = query.trim().toLowerCase();
     const filtered = products.filter((product) => {
@@ -298,6 +380,7 @@ export default function MenuBoard({ stalls }: { stalls: Stall[] }) {
         query={query}
         setCategory={setCategory}
         setQuery={setQuery}
+        categories={categories}
       />
       <HeroBanner />
       <main className="mx-auto -mt-10 max-w-[1500px] px-5 pb-10">

@@ -39,7 +39,8 @@ values
   ('560068', 'Bengaluru', true),
   ('560076', 'Bengaluru', true),
   ('560100', 'Bengaluru', true),
-  ('560102', 'Bengaluru', true)
+  ('560102', 'Bengaluru', true),
+  ('562106', 'Anekal', true)
 on conflict (pincode) do update set
   city = excluded.city,
   is_active = excluded.is_active;

@@ -7,6 +7,7 @@ type MenuItemPayload = {
   stall_id?: string | number;
   name?: string;
   price?: string | number;
+  category?: string;
   is_available?: boolean;
 };
 
@@ -26,6 +27,7 @@ function cleanPayload(payload: MenuItemPayload) {
       stall_id: payload.stall_id,
       name: payload.name.trim(),
       price,
+      category: payload.category?.trim() || "Fresh",
       is_available: payload.is_available ?? true,
     },
   };

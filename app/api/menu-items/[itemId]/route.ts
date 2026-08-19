@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 type MenuItemUpdate = {
   name?: string;
   price?: string | number;
+  category?: string;
   is_available?: boolean;
 };
 
@@ -26,6 +27,10 @@ function cleanUpdate(payload: MenuItemUpdate) {
       return { error: "Price must be greater than zero." };
     }
     update.price = price;
+  }
+
+  if (payload.category !== undefined) {
+    update.category = payload.category.trim() || "Fresh";
   }
 
   if (payload.is_available !== undefined) {

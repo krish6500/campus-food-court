@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-const fallbackPincodes = new Set(["560068", "560076", "560100", "560102"]);
+const fallbackPincodes = new Set([
+  "560068",
+  "560076",
+  "560100",
+  "560102",
+  "562106",
+]);
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +28,15 @@ export async function GET(request: NextRequest) {
     .eq("is_active", true)
     .maybeSingle();
 
-  if (error) {
+  if (error || !data) {
     return NextResponse.json({
       serviceable: fallbackPincodes.has(pincode),
-      city: fallbackPincodes.has(pincode) ? "Bengaluru" : null,
+      city:
+        pincode === "562106"
+          ? "Anekal"
+          : fallbackPincodes.has(pincode)
+            ? "Bengaluru"
+            : null,
     });
   }
 

@@ -8,6 +8,7 @@ type MenuItem = {
   stall_id: number | string;
   name: string;
   price: number | string;
+  category?: string | null;
   is_available?: boolean | null;
 };
 
@@ -22,6 +23,7 @@ type FormState = {
   stall_id: string;
   name: string;
   price: string;
+  category: string;
   is_available: boolean;
 };
 
@@ -59,8 +61,20 @@ const emptyForm: FormState = {
   stall_id: "",
   name: "",
   price: "",
+  category: "Fresh",
   is_available: true,
 };
+
+const storefrontCategories = [
+  "Fresh",
+  "Electronics",
+  "Home & Kitchen",
+  "Fashion",
+  "Mobiles",
+  "Beauty",
+  "Computers",
+  "Daily Deals",
+];
 
 function sortItems(items: MenuItem[]) {
   return [...items].sort((a, b) => a.name.localeCompare(b.name));
@@ -149,6 +163,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       stall_id: String(item.stall_id),
       name: item.name,
       price: String(item.price),
+      category: item.category ?? "Fresh",
       is_available: item.is_available !== false,
     });
     setStatus(null);
@@ -325,11 +340,11 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
               Owner dashboard
             </p>
             <h1 className="mt-2 text-4xl font-extrabold tracking-tight">
-              Manage Menu
+              Super Bazar Owner
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-              Add dishes, change prices, remove old items, and control what
-              customers can order.
+              Manage storefront products, category columns, counter orders,
+              banners, and payment settings.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -461,6 +476,38 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
           </div>
         </section>
 
+        <section className="mb-6 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-extrabold">Banner feature flags</h2>
+            <p className="mt-2 text-sm text-zinc-500">
+              Promotional banners are loaded from the Supabase `banners` table.
+              Toggle `is_active` in Supabase to turn campaigns on or off.
+            </p>
+            <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+              Run `supabase-super-bazar.sql` to create the banner and pincode
+              tables, including the Great Indian Festival banner.
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-extrabold">Payment gateway</h2>
+            <div className="mt-4 grid gap-3 text-sm">
+              <label className="flex items-center justify-between rounded-md border border-zinc-200 p-3 font-bold">
+                Mock card checkout
+                <input checked readOnly className="h-4 w-4 accent-emerald-700" type="checkbox" />
+              </label>
+              <label className="flex items-center justify-between rounded-md border border-zinc-200 p-3 font-bold text-zinc-500">
+                Razorpay live gateway
+                <input readOnly className="h-4 w-4" type="checkbox" />
+              </label>
+              <p className="text-xs font-semibold text-zinc-500">
+                Razorpay is removed from the Super Bazar checkout UI. Keep
+                Razorpay keys empty in Vercel while using mock payments.
+              </p>
+            </div>
+          </div>
+        </section>
+
         <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
           <section className="h-fit rounded-lg border border-zinc-200 bg-white p-5 shadow-sm lg:sticky lg:top-6">
             <h2 className="text-xl font-extrabold">
@@ -526,6 +573,27 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
                   type="number"
                   value={form.price}
                 />
+              </div>
+
+              <div>
+                <label
+                  className="mb-2 block text-sm font-bold"
+                  htmlFor="item-category"
+                >
+                  Storefront category
+                </label>
+                <select
+                  className="h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                  id="item-category"
+                  onChange={(event) =>
+                    updateForm("category", event.target.value)
+                  }
+                  value={form.category}
+                >
+                  {storefrontCategories.map((category) => (
+                    <option key={category}>{category}</option>
+                  ))}
+                </select>
               </div>
 
               <label className="flex items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm font-bold">
@@ -632,7 +700,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
                           </span>
                         </div>
                         <p className="mt-1 text-sm text-zinc-500">
-                          Price: Rs {item.price}
+                          {item.category ?? "Fresh"} / Price: Rs {item.price}
                         </p>
                       </div>
 
