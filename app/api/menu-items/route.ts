@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { isOwnerAuthenticated } from "@/lib/owner-auth";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type MenuItemPayload = {
   stall_id?: string | number;
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
+  const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("menu_items")
     .insert(result.item)

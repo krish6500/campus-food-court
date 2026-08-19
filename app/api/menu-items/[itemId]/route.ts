@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { isOwnerAuthenticated } from "@/lib/owner-auth";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 type MenuItemUpdate = {
   name?: string;
@@ -63,6 +63,7 @@ export async function PATCH(
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
+  const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("menu_items")
     .update(result.update)
@@ -89,6 +90,7 @@ export async function DELETE(
   }
 
   const { itemId } = await context.params;
+  const supabase = getSupabaseAdmin();
   const { error } = await supabase
     .from("menu_items")
     .delete()
