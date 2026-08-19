@@ -44,7 +44,7 @@ export async function setOwnerSession() {
     value: createOwnerSessionValue(),
     httpOnly: true,
     maxAge: 60 * 60 * 8,
-    path: "/owner",
+    path: "/",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
@@ -57,7 +57,7 @@ export async function clearOwnerSession() {
     name: OWNER_SESSION_COOKIE,
     value: "",
     maxAge: 0,
-    path: "/owner",
+    path: "/",
   });
 }
 

@@ -32,6 +32,26 @@ type Status = {
   message: string;
 };
 
+type Banner = {
+  id: string;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  linkUrl: string;
+  isActive: boolean;
+  displayOrder: number;
+};
+
+type BannerForm = {
+  id: string | null;
+  title: string;
+  subtitle: string;
+  imageUrl: string;
+  linkUrl: string;
+  isActive: boolean;
+  displayOrder: string;
+};
+
 type CounterOrder = {
   orderId: string;
   customer: {
@@ -63,6 +83,16 @@ const emptyForm: FormState = {
   price: "",
   category: "Fresh",
   is_available: true,
+};
+
+const emptyBannerForm: BannerForm = {
+  id: null,
+  title: "",
+  subtitle: "",
+  imageUrl: "",
+  linkUrl: "#fresh",
+  isActive: true,
+  displayOrder: "0",
 };
 
 const storefrontCategories = [
@@ -97,23 +127,27 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       ]),
     ) as Record<string, MenuItem[]>,
   );
-  const [selectedStall, setSelectedStall] = useState(
-    stalls[0] ? String(stalls[0].stall_id) : "",
-  );
+  const defaultStallId = stalls[0] ? String(stalls[0].stall_id) : "";
+  const [selectedCategory, setSelectedCategory] = useState("Fresh");
   const [form, setForm] = useState<FormState>({
     ...emptyForm,
-    stall_id: stalls[0] ? String(stalls[0].stall_id) : "",
+    stall_id: defaultStallId,
   });
+  const [bannerForm, setBannerForm] = useState<BannerForm>(emptyBannerForm);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
   const [counterOrders, setCounterOrders] = useState<CounterOrder[]>([]);
 
-  const selectedStallRecord = useMemo(
-    () => stalls.find((stall) => String(stall.stall_id) === selectedStall),
-    [selectedStall, stalls],
+  const allItems = useMemo(
+    () => sortItems(Object.values(itemsByStall).flat()),
+    [itemsByStall],
   );
-  const currentItems = itemsByStall[selectedStall] ?? [];
+  const currentItems = allItems.filter(
+    (item) => (item.category ?? "Fresh") === selectedCategory,
+  );
   const totalItems = Object.values(itemsByStall).reduce(
     (sum, items) => sum + items.length,
     0,
@@ -143,18 +177,60 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
     };
   }, []);
 
+  useEffect(() => {
+    const syncBanners = async () => {
+      const response = await fetch("/api/banners?owner=1", {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = await response.json();
+      setBanners(data.banners ?? []);
+    };
+
+    syncBanners();
+  }, []);
+
   function updateForm<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function resetForm(stallId = selectedStall) {
-    setEditingItemId(null);
-    setForm({ ...emptyForm, stall_id: stallId });
+  function updateBannerForm<K extends keyof BannerForm>(
+    key: K,
+    value: BannerForm[K],
+  ) {
+    setBannerForm((current) => ({ ...current, [key]: value }));
   }
 
-  function selectStall(stallId: string) {
-    setSelectedStall(stallId);
-    resetForm(stallId);
+  function resetForm(stallId = defaultStallId, category = selectedCategory) {
+    setEditingItemId(null);
+    setForm({ ...emptyForm, stall_id: stallId, category });
+  }
+
+  function startBannerEdit(banner: Banner) {
+    setBannerForm({
+      id: banner.id,
+      title: banner.title,
+      subtitle: banner.subtitle,
+      imageUrl: banner.imageUrl,
+      linkUrl: banner.linkUrl,
+      isActive: banner.isActive,
+      displayOrder: String(banner.displayOrder),
+    });
+    setStatus(null);
+  }
+
+  function upsertBannerLocal(banner: Banner) {
+    setBanners((current) => {
+      const next = current.some((item) => item.id === banner.id)
+        ? current.map((item) => (item.id === banner.id ? banner : item))
+        : [...current, banner];
+
+      return [...next].sort((a, b) => a.displayOrder - b.displayOrder);
+    });
   }
 
   function startEdit(item: MenuItem) {
@@ -166,6 +242,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       category: item.category ?? "Fresh",
       is_available: item.is_available !== false,
     });
+    setSelectedCategory(item.category ?? "Fresh");
     setStatus(null);
   }
 
@@ -209,8 +286,8 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       }
 
       upsertLocal(data.item);
-      selectStall(String(data.item.stall_id));
-      resetForm(String(data.item.stall_id));
+      setSelectedCategory(data.item.category ?? "Fresh");
+      resetForm(String(data.item.stall_id), data.item.category ?? "Fresh");
       setStatus({
         tone: "success",
         message: editingItemId ? "Item updated." : "Item added.",
@@ -223,6 +300,74 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       });
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function submitBanner(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSavingBanner(true);
+    setStatus({ tone: "info", message: "Saving banner..." });
+
+    try {
+      const response = await fetch("/api/banners", {
+        method: bannerForm.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: bannerForm.id,
+          title: bannerForm.title,
+          subtitle: bannerForm.subtitle,
+          imageUrl: bannerForm.imageUrl,
+          linkUrl: bannerForm.linkUrl,
+          isActive: bannerForm.isActive,
+          displayOrder: bannerForm.displayOrder,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Could not save banner.");
+      }
+
+      upsertBannerLocal(data.banner);
+      setBannerForm(emptyBannerForm);
+      setStatus({ tone: "success", message: "Banner saved." });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message: error instanceof Error ? error.message : "Could not save banner.",
+      });
+    } finally {
+      setIsSavingBanner(false);
+    }
+  }
+
+  async function deleteBanner(banner: Banner) {
+    const shouldDelete = window.confirm(`Delete banner ${banner.title}?`);
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    setStatus({ tone: "info", message: "Deleting banner..." });
+
+    try {
+      const response = await fetch(`/api/banners?id=${banner.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Could not delete banner.");
+      }
+
+      setBanners((current) => current.filter((item) => item.id !== banner.id));
+      setStatus({ tone: "success", message: "Banner deleted." });
+    } catch (error) {
+      setStatus({
+        tone: "error",
+        message:
+          error instanceof Error ? error.message : "Could not delete banner.",
+      });
     }
   }
 
@@ -492,14 +637,126 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
 
         <section className="mb-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-extrabold">Banner feature flags</h2>
-            <p className="mt-2 text-sm text-zinc-500">
-              Promotional banners are loaded from the Supabase `banners` table.
-              Toggle `is_active` in Supabase to turn campaigns on or off.
-            </p>
-            <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-              Run `supabase-super-bazar.sql` to create the banner and pincode
-              tables, including the Great Indian Festival banner.
+            <h2 className="text-xl font-extrabold">Hero banners</h2>
+            <form className="mt-4 grid gap-3" onSubmit={submitBanner}>
+              <input
+                className="h-11 rounded-md border border-zinc-300 px-3 text-sm"
+                onChange={(event) => updateBannerForm("title", event.target.value)}
+                placeholder="Banner title"
+                required
+                value={bannerForm.title}
+              />
+              <input
+                className="h-11 rounded-md border border-zinc-300 px-3 text-sm"
+                onChange={(event) =>
+                  updateBannerForm("subtitle", event.target.value)
+                }
+                placeholder="Subtitle"
+                value={bannerForm.subtitle}
+              />
+              <input
+                className="h-11 rounded-md border border-zinc-300 px-3 text-sm"
+                onChange={(event) =>
+                  updateBannerForm("imageUrl", event.target.value)
+                }
+                placeholder="Image URL"
+                required
+                type="url"
+                value={bannerForm.imageUrl}
+              />
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
+                <select
+                  className="h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold"
+                  onChange={(event) =>
+                    updateBannerForm("linkUrl", event.target.value)
+                  }
+                  value={bannerForm.linkUrl}
+                >
+                  {storefrontCategories.map((category) => (
+                    <option key={category} value={`#${category.toLowerCase().replaceAll(" ", "-").replace("&", "")}`}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="h-11 rounded-md border border-zinc-300 px-3 text-sm"
+                  min="0"
+                  onChange={(event) =>
+                    updateBannerForm("displayOrder", event.target.value)
+                  }
+                  placeholder="Order"
+                  type="number"
+                  value={bannerForm.displayOrder}
+                />
+              </div>
+              <label className="flex items-center gap-3 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm font-bold">
+                <input
+                  checked={bannerForm.isActive}
+                  className="h-4 w-4 accent-emerald-700"
+                  onChange={(event) =>
+                    updateBannerForm("isActive", event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                Show banner on home page
+              </label>
+              <div className="flex gap-2">
+                <button
+                  className="h-11 flex-1 rounded-md bg-emerald-700 px-4 text-sm font-extrabold text-white hover:bg-emerald-800 disabled:bg-zinc-300"
+                  disabled={isSavingBanner}
+                  type="submit"
+                >
+                  {isSavingBanner
+                    ? "Saving..."
+                    : bannerForm.id
+                      ? "Update banner"
+                      : "Add banner"}
+                </button>
+                {bannerForm.id ? (
+                  <button
+                    className="h-11 rounded-md border border-zinc-300 px-4 text-sm font-bold"
+                    onClick={() => setBannerForm(emptyBannerForm)}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                ) : null}
+              </div>
+            </form>
+
+            <div className="mt-5 space-y-3">
+              {banners.map((banner) => (
+                <article
+                  className="rounded-md border border-zinc-200 p-3"
+                  key={banner.id}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-extrabold">{banner.title}</h3>
+                      <p className="mt-1 text-xs font-semibold text-zinc-500">
+                        {banner.isActive ? "Visible" : "Hidden"} /{" "}
+                        {banner.linkUrl}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        className="rounded-md border border-zinc-300 px-3 py-2 text-xs font-bold"
+                        onClick={() => startBannerEdit(banner)}
+                        type="button"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="rounded-md bg-red-600 px-3 py-2 text-xs font-bold text-white"
+                        onClick={() => deleteBanner(banner)}
+                        type="button"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           </div>
 
@@ -529,29 +786,6 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
               {editingItemId ? "Edit item" : "Add new item"}
             </h2>
             <form className="mt-5 space-y-4" onSubmit={submitForm}>
-              <div>
-                <label
-                  className="mb-2 block text-sm font-bold"
-                  htmlFor="stall-id"
-                >
-                  Stall
-                </label>
-                <select
-                  className="h-11 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  id="stall-id"
-                  onChange={(event) =>
-                    updateForm("stall_id", event.target.value)
-                  }
-                  value={form.stall_id}
-                >
-                  {stalls.map((stall) => (
-                    <option key={stall.stall_id} value={stall.stall_id}>
-                      {stall.stall_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div>
                 <label
                   className="mb-2 block text-sm font-bold"
@@ -664,18 +898,21 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
 
           <section className="min-w-0 space-y-4">
             <div className="flex gap-2 overflow-x-auto rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-              {stalls.map((stall) => (
+              {storefrontCategories.map((category) => (
                 <button
                   className={`h-11 shrink-0 rounded-md border px-4 text-sm font-bold ${
-                    selectedStall === String(stall.stall_id)
+                    selectedCategory === category
                       ? "border-emerald-700 bg-emerald-700 text-white"
                       : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-500"
                   }`}
-                  key={stall.stall_id}
-                  onClick={() => selectStall(String(stall.stall_id))}
+                  key={category}
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    resetForm(defaultStallId, category);
+                  }}
                   type="button"
                 >
-                  {stall.stall_name}
+                  {category}
                 </button>
               ))}
             </div>
@@ -683,10 +920,10 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
             <div className="rounded-lg border border-zinc-200 bg-white shadow-sm">
               <div className="border-b border-zinc-100 p-5">
                 <h2 className="text-xl font-extrabold">
-                  {selectedStallRecord?.stall_name ?? "Menu items"}
+                  {selectedCategory}
                 </h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  {currentItems.length} items in this stall
+                  {currentItems.length} products in this category
                 </p>
               </div>
 
