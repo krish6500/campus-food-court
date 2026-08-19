@@ -45,6 +45,7 @@ type OrderRow = {
   gst: number;
   platform_fee: number;
   total: number;
+  total_amount?: number;
   bill_message: string;
   sms_status: string | null;
   created_at: string;
@@ -65,7 +66,7 @@ export function toStoredOrder(row: OrderRow): StoredOrder {
     subtotal: Number(row.subtotal),
     gst: Number(row.gst),
     platformFee: Number(row.platform_fee),
-    total: Number(row.total),
+    total: Number(row.total ?? row.total_amount),
     createdAt: row.created_at,
     billMessage: row.bill_message,
     smsStatus: row.sms_status ?? undefined,
@@ -89,6 +90,7 @@ export async function createOrder(order: StoredOrder) {
       gst: order.gst,
       platform_fee: order.platformFee,
       total: order.total,
+      total_amount: order.total,
       bill_message: order.billMessage,
       sms_status: order.smsStatus ?? null,
     })

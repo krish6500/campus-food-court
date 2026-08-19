@@ -14,6 +14,7 @@ create table if not exists public.orders (
   gst numeric(10, 2) not null default 0,
   platform_fee numeric(10, 2) not null default 0,
   total numeric(10, 2) not null default 0,
+  total_amount numeric(10, 2) not null default 0,
   bill_message text not null,
   sms_status text,
   created_at timestamptz not null default now()

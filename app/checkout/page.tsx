@@ -164,9 +164,7 @@ export default function CheckoutPage() {
 
     const orderId = data.order?.orderId ?? data.order?.order_id;
     writeCart([]);
-    router.push(
-      `/order-confirmation?orderId=${orderId}&total=${data.order?.total ?? totals.total}`,
-    );
+    router.push(`/?orderId=${orderId}`);
   }
 
   async function startRazorpayPayment() {
