@@ -167,7 +167,10 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
 
   useEffect(() => {
     const syncOrders = async () => {
-      const response = await fetch("/api/orders", { cache: "no-store" });
+      const response = await fetch("/api/orders", {
+        cache: "no-store",
+        credentials: "include",
+      });
 
       if (!response.ok) {
         return;
@@ -189,6 +192,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
     const syncBanners = async () => {
       const response = await fetch("/api/banners?owner=1", {
         cache: "no-store",
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -308,6 +312,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
         editingItemId ? `/api/menu-items/${editingItemId}` : "/api/menu-items",
         {
           method: editingItemId ? "PATCH" : "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(form),
         },
@@ -346,6 +351,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
     try {
       const response = await fetch("/api/banners", {
         method: bannerForm.id ? "PATCH" : "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: bannerForm.id,
@@ -387,6 +393,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
 
     try {
       const response = await fetch(`/api/banners?id=${banner.id}`, {
+        credentials: "include",
         method: "DELETE",
       });
       const data = await response.json();
@@ -415,6 +422,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
     try {
       const response = await fetch(`/api/menu-items/${item.item_id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ is_available: nextAvailable }),
       });
@@ -451,6 +459,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
 
     try {
       const response = await fetch(`/api/menu-items/${item.item_id}`, {
+        credentials: "include",
         method: "DELETE",
       });
       const data = await response.json();
@@ -487,6 +496,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
     try {
       const response = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });

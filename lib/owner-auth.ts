@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 
 const OWNER_SESSION_COOKIE = "cfc_owner_session";
+const OWNER_API_SESSION_COOKIE = "cfc_owner_api_session";
 
 function getOwnerCredentials() {
   return {
@@ -50,6 +51,15 @@ export async function setOwnerSession() {
     secure: process.env.NODE_ENV === "production",
   });
   cookieStore.set({
+    name: OWNER_API_SESSION_COOKIE,
+    value,
+    httpOnly: true,
+    maxAge: 60 * 60 * 8,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  cookieStore.set({
     name: OWNER_SESSION_COOKIE,
     value,
     httpOnly: true,
@@ -63,22 +73,24 @@ export async function setOwnerSession() {
 export async function clearOwnerSession() {
   const cookieStore = await cookies();
 
-  ["/", "/owner"].forEach((path) => {
+  [OWNER_SESSION_COOKIE, OWNER_API_SESSION_COOKIE].forEach((name) => {
     cookieStore.set({
-      name: OWNER_SESSION_COOKIE,
+      name,
       value: "",
       maxAge: 0,
-      path,
+      path: "/",
     });
+  });
+  cookieStore.set({
+    name: OWNER_SESSION_COOKIE,
+    value: "",
+    maxAge: 0,
+    path: "/owner",
   });
 }
 
-export async function isOwnerAuthenticated() {
-  const credentials = getOwnerCredentials();
-  const cookieStore = await cookies();
-  const session = cookieStore.get(OWNER_SESSION_COOKIE)?.value;
-
-  if (!credentials.secret || !session) {
+function isValidSession(session: string | undefined, secret: string) {
+  if (!session) {
     return false;
   }
 
@@ -88,11 +100,35 @@ export async function isOwnerAuthenticated() {
     return false;
   }
 
-  const expected = sign(payload, credentials.secret);
+  const expected = sign(payload, secret);
 
   if (signature.length !== expected.length) {
     return false;
   }
 
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
+
+function findValidSession(
+  sessions: { name: string; value: string }[],
+  secret: string,
+) {
+  return sessions.some((session) => isValidSession(session.value, secret));
+}
+
+export async function isOwnerAuthenticated() {
+  const credentials = getOwnerCredentials();
+  const cookieStore = await cookies();
+
+  if (!credentials.secret) {
+    return false;
+  }
+
+  return findValidSession(
+    [
+      ...cookieStore.getAll(OWNER_SESSION_COOKIE),
+      ...cookieStore.getAll(OWNER_API_SESSION_COOKIE),
+    ],
+    credentials.secret,
+  );
 }
