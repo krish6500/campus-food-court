@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { errorMessage, menuItemSchemaHint } from "@/lib/api-errors";
 import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -52,19 +53,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("menu_items")
-    .insert(result.item)
-    .select("*")
-    .single();
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("menu_items")
+      .insert(result.item)
+      .select("*")
+      .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json(
+        { error: menuItemSchemaHint(error.message) },
+        { status: 500 },
+      );
+    }
+
+    revalidatePath("/");
+    revalidatePath("/owner");
+
+    return NextResponse.json({ item: data }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: errorMessage(error, "Could not save menu item.") },
+      { status: 500 },
+    );
   }
-
-  revalidatePath("/");
-  revalidatePath("/owner");
-
-  return NextResponse.json({ item: data }, { status: 201 });
 }

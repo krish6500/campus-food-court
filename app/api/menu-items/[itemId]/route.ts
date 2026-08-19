@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
+import { errorMessage, menuItemSchemaHint } from "@/lib/api-errors";
 import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -63,22 +64,32 @@ export async function PATCH(
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
 
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
-    .from("menu_items")
-    .update(result.update)
-    .eq("item_id", itemId)
-    .select("*")
-    .single();
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from("menu_items")
+      .update(result.update)
+      .eq("item_id", itemId)
+      .select("*")
+      .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json(
+        { error: menuItemSchemaHint(error.message) },
+        { status: 500 },
+      );
+    }
+
+    revalidatePath("/");
+    revalidatePath("/owner");
+
+    return NextResponse.json({ item: data });
+  } catch (error) {
+    return NextResponse.json(
+      { error: errorMessage(error, "Could not update menu item.") },
+      { status: 500 },
+    );
   }
-
-  revalidatePath("/");
-  revalidatePath("/owner");
-
-  return NextResponse.json({ item: data });
 }
 
 export async function DELETE(
@@ -90,18 +101,25 @@ export async function DELETE(
   }
 
   const { itemId } = await context.params;
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase
-    .from("menu_items")
-    .delete()
-    .eq("item_id", itemId);
+  try {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from("menu_items")
+      .delete()
+      .eq("item_id", itemId);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    revalidatePath("/");
+    revalidatePath("/owner");
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: errorMessage(error, "Could not delete menu item.") },
+      { status: 500 },
+    );
   }
-
-  revalidatePath("/");
-  revalidatePath("/owner");
-
-  return NextResponse.json({ ok: true });
 }

@@ -375,6 +375,20 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
           </div>
         </header>
 
+        {status ? (
+          <div
+            className={`mb-6 rounded-lg border p-4 text-sm font-semibold ${
+              status.tone === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : status.tone === "error"
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-amber-200 bg-amber-50 text-amber-800"
+            }`}
+          >
+            {status.message}
+          </div>
+        ) : null}
+
         <section className="mb-6 rounded-lg border border-zinc-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-zinc-100 p-5 md:flex-row md:items-center md:justify-between">
             <div>
