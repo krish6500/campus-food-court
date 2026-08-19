@@ -118,6 +118,14 @@ function money(value: number) {
   }).format(value);
 }
 
+function ownerErrorMessage(message: string, fallback: string) {
+  if (message === "Owner login required.") {
+    return "Owner session expired. Click Logout, then login again.";
+  }
+
+  return message || fallback;
+}
+
 export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
   const [itemsByStall, setItemsByStall] = useState(() =>
     Object.fromEntries(
@@ -233,6 +241,31 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
     });
   }
 
+  function uploadBannerImage(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setStatus({ tone: "error", message: "Upload an image file." });
+      return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      updateBannerForm("imageUrl", String(reader.result ?? ""));
+      setStatus({
+        tone: "success",
+        message: "Banner image loaded. Save the banner to publish it.",
+      });
+    };
+    reader.onerror = () => {
+      setStatus({ tone: "error", message: "Could not read banner image." });
+    };
+    reader.readAsDataURL(file);
+  }
+
   function startEdit(item: MenuItem) {
     setEditingItemId(String(item.item_id));
     setForm({
@@ -282,7 +315,9 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Could not save menu item.");
+        throw new Error(
+          ownerErrorMessage(data?.error, "Could not save menu item."),
+        );
       }
 
       upsertLocal(data.item);
@@ -325,7 +360,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Could not save banner.");
+        throw new Error(ownerErrorMessage(data?.error, "Could not save banner."));
       }
 
       upsertBannerLocal(data.banner);
@@ -357,7 +392,9 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Could not delete banner.");
+        throw new Error(
+          ownerErrorMessage(data?.error, "Could not delete banner."),
+        );
       }
 
       setBanners((current) => current.filter((item) => item.id !== banner.id));
@@ -384,7 +421,9 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Could not update availability.");
+        throw new Error(
+          ownerErrorMessage(data?.error, "Could not update availability."),
+        );
       }
 
       upsertLocal(data.item);
@@ -417,7 +456,9 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Could not delete menu item.");
+        throw new Error(
+          ownerErrorMessage(data?.error, "Could not delete menu item."),
+        );
       }
 
       setItemsByStall((current) => ({
@@ -452,7 +493,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error ?? "Could not update order.");
+        throw new Error(ownerErrorMessage(data?.error, "Could not update order."));
       }
 
       setCounterOrders((current) =>
@@ -661,9 +702,25 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
                 }
                 placeholder="Image URL"
                 required
-                type="url"
+                type="text"
                 value={bannerForm.imageUrl}
               />
+              <input
+                accept="image/*"
+                className="rounded-md border border-dashed border-zinc-300 bg-zinc-50 p-3 text-sm font-semibold"
+                onChange={(event) => uploadBannerImage(event.target.files?.[0])}
+                type="file"
+              />
+              {bannerForm.imageUrl ? (
+                <div className="overflow-hidden rounded-md border border-zinc-200 bg-zinc-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt="Banner preview"
+                    className="h-32 w-full object-cover"
+                    src={bannerForm.imageUrl}
+                  />
+                </div>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_120px]">
                 <select
                   className="h-11 rounded-md border border-zinc-300 bg-white px-3 text-sm font-semibold"

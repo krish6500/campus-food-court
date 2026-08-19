@@ -38,13 +38,23 @@ export function createOwnerSessionValue() {
 
 export async function setOwnerSession() {
   const cookieStore = await cookies();
+  const value = createOwnerSessionValue();
 
   cookieStore.set({
     name: OWNER_SESSION_COOKIE,
-    value: createOwnerSessionValue(),
+    value,
     httpOnly: true,
     maxAge: 60 * 60 * 8,
     path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  cookieStore.set({
+    name: OWNER_SESSION_COOKIE,
+    value,
+    httpOnly: true,
+    maxAge: 60 * 60 * 8,
+    path: "/owner",
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
   });
@@ -53,11 +63,13 @@ export async function setOwnerSession() {
 export async function clearOwnerSession() {
   const cookieStore = await cookies();
 
-  cookieStore.set({
-    name: OWNER_SESSION_COOKIE,
-    value: "",
-    maxAge: 0,
-    path: "/",
+  ["/", "/owner"].forEach((path) => {
+    cookieStore.set({
+      name: OWNER_SESSION_COOKIE,
+      value: "",
+      maxAge: 0,
+      path,
+    });
   });
 }
 
