@@ -25,7 +25,7 @@ export default async function OwnerLoginPage({
         </p>
         <h1 className="mt-2 text-3xl font-extrabold">Owner login</h1>
         <p className="mt-2 text-sm leading-6 text-zinc-600">
-          Sign in to manage menu items and counter orders.
+          Sign in to manage menu items and customer orders.
         </p>
 
         {!isConfigured ? (

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { isOwnerAuthenticated } from "@/lib/owner-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -67,8 +66,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Owner login required." }, { status: 401 });
   }
 
-  const client = ownerMode ? getSupabaseAdmin() : supabase;
-  let query = client
+  let query = getSupabaseAdmin()
     .from("banners")
     .select("id, title, subtitle, image_url, link_url, is_active, display_order")
     .order("display_order", { ascending: true });

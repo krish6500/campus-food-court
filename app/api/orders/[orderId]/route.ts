@@ -34,7 +34,7 @@ export async function PATCH(
     if (body.status === "ready") {
       smsStatus = await sendCustomerMessage({
         to: order.customer.mobile,
-        message: `Order ${order.orderId} is ready. Please pick it up from the counter.`,
+        message: `Order ${order.orderId} has been delivered.`,
       });
     }
 

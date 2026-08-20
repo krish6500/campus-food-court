@@ -123,7 +123,7 @@ export async function POST(request: Request) {
   const billMessage = `Payment successful. Bill ${orderId}: ${money(totals.total)} for ${items.reduce(
     (sum, item) => sum + item.quantity,
     0,
-  )} item(s). Counter received your order. We will message again when it is ready for pickup.`;
+  )} item(s). Your order has been received. We will message again when it is dispatched.`;
   const smsStatus = await sendCustomerMessage({
     to: customer.mobile,
     message: billMessage,

@@ -126,6 +126,18 @@ function ownerErrorMessage(message: string, fallback: string) {
   return message || fallback;
 }
 
+function orderStatusLabel(status: CounterOrder["status"]) {
+  if (status === "ready") {
+    return "delivered";
+  }
+
+  if (status === "preparing") {
+    return "dispatched";
+  }
+
+  return "received";
+}
+
 export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
   const [itemsByStall, setItemsByStall] = useState(() =>
     Object.fromEntries(
@@ -515,8 +527,8 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
         tone: "success",
         message:
           nextStatus === "ready"
-            ? `Order ${orderId} marked ready. Customer can pick it up. ${data.order.smsStatus ?? ""}`
-            : `Order ${orderId} moved to preparing.`,
+            ? `Order ${orderId} marked delivered. ${data.order.smsStatus ?? ""}`
+            : `Order ${orderId} marked dispatched.`,
       });
     } catch (error) {
       setStatus({
@@ -539,7 +551,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
               Super Bazar Owner
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600">
-              Manage storefront products, category columns, counter orders,
+              Manage storefront products, category columns, customer orders,
               banners, and payment settings.
             </p>
           </div>
@@ -588,9 +600,9 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
         <section className="mb-6 rounded-lg border border-zinc-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-zinc-100 p-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-xl font-extrabold">Counter orders</h2>
+              <h2 className="text-xl font-extrabold">Customer orders</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                {activeOrders.length} active orders waiting in the counter system
+                {activeOrders.length} active orders waiting to be delivered
               </p>
             </div>
             <div className="rounded-md bg-amber-100 px-4 py-3 text-center">
@@ -626,7 +638,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
                             : "bg-emerald-100 text-emerald-800"
                       }`}
                     >
-                      {order.status.replaceAll("_", " ")}
+                      {orderStatusLabel(order.status)}
                     </span>
                   </div>
 
@@ -665,7 +677,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
                       onClick={() => updateOrderStatus(order.orderId, "preparing")}
                       type="button"
                     >
-                      Start preparing
+                      Mark dispatched
                     </button>
                     <button
                       className="h-10 rounded-md bg-blue-700 px-3 text-sm font-bold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
@@ -673,7 +685,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
                       onClick={() => updateOrderStatus(order.orderId, "ready")}
                       type="button"
                     >
-                      Mark prepared
+                      Mark delivered
                     </button>
                   </div>
                 </article>
@@ -839,7 +851,7 @@ export default function OwnerMenuManager({ stalls }: { stalls: Stall[] }) {
                 <input checked readOnly className="h-4 w-4 accent-emerald-700" type="checkbox" />
               </label>
               <p className="text-xs font-semibold text-zinc-500">
-                Orders are sent to the counter only after Razorpay payment
+                Orders are created only after Razorpay payment
                 verification succeeds. Add Razorpay keys in Vercel before going
                 live.
               </p>
